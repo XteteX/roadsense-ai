@@ -1,0 +1,502 @@
+[
+    {
+        "id": 1,
+        "type": "pothole",
+        "lat": 43.245724,
+        "lon": 76.933651,
+        "size_cm": 38.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 2,
+        "type": "faded_marking",
+        "lat": 43.245027,
+        "lon": 76.931216,
+        "size_cm": 16.6,
+        "traffic_level": 3,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 3,
+        "type": "pothole",
+        "lat": 43.23036,
+        "lon": 76.854986,
+        "size_cm": 29.7,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 4,
+        "type": "crack",
+        "lat": 43.209255,
+        "lon": 76.92497,
+        "size_cm": 12.3,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 5,
+        "type": "faded_marking",
+        "lat": 43.231933,
+        "lon": 76.917779,
+        "size_cm": 36.3,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 6,
+        "type": "pothole",
+        "lat": 43.21109,
+        "lon": 76.862048,
+        "size_cm": 21.9,
+        "traffic_level": 2,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 7,
+        "type": "pothole",
+        "lat": 43.212879,
+        "lon": 76.935701,
+        "size_cm": 38.8,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 8,
+        "type": "crack",
+        "lat": 43.208602,
+        "lon": 76.873673,
+        "size_cm": 14.7,
+        "traffic_level": 3,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 9,
+        "type": "pothole",
+        "lat": 43.22102,
+        "lon": 76.93232,
+        "size_cm": 22.4,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 10,
+        "type": "crack",
+        "lat": 43.269227,
+        "lon": 76.87204,
+        "size_cm": 37.9,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 11,
+        "type": "pothole",
+        "lat": 43.219789,
+        "lon": 76.891322,
+        "size_cm": 16.7,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 12,
+        "type": "crack",
+        "lat": 43.255204,
+        "lon": 76.903803,
+        "size_cm": 18.2,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 13,
+        "type": "crack",
+        "lat": 43.248352,
+        "lon": 76.859848,
+        "size_cm": 32.5,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 14,
+        "type": "rutting",
+        "lat": 43.258921,
+        "lon": 76.888779,
+        "size_cm": 7.5,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 15,
+        "type": "crack",
+        "lat": 43.235975,
+        "lon": 76.914376,
+        "size_cm": 27.8,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 16,
+        "type": "rutting",
+        "lat": 43.232384,
+        "lon": 76.877467,
+        "size_cm": 19.1,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 17,
+        "type": "pothole",
+        "lat": 43.25245,
+        "lon": 76.93258,
+        "size_cm": 38.6,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 18,
+        "type": "faded_marking",
+        "lat": 43.226452,
+        "lon": 76.861132,
+        "size_cm": 6.5,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 19,
+        "type": "pothole",
+        "lat": 43.253809,
+        "lon": 76.865609,
+        "size_cm": 22.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 20,
+        "type": "rutting",
+        "lat": 43.23928,
+        "lon": 76.923927,
+        "size_cm": 19.8,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 21,
+        "type": "pothole",
+        "lat": 43.24682,
+        "lon": 76.94272,
+        "size_cm": 21.3,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 22,
+        "type": "crack",
+        "lat": 43.216897,
+        "lon": 76.942466,
+        "size_cm": 15.3,
+        "traffic_level": 2,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 23,
+        "type": "crack",
+        "lat": 43.214464,
+        "lon": 76.917897,
+        "size_cm": 21.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 24,
+        "type": "pothole",
+        "lat": 43.201163,
+        "lon": 76.94257,
+        "size_cm": 35.4,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 25,
+        "type": "crack",
+        "lat": 43.228502,
+        "lon": 76.926313,
+        "size_cm": 23.9,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 26,
+        "type": "crack",
+        "lat": 43.221549,
+        "lon": 76.903562,
+        "size_cm": 31.2,
+        "traffic_level": 2,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 27,
+        "type": "crack",
+        "lat": 43.253621,
+        "lon": 76.933585,
+        "size_cm": 25.3,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 28,
+        "type": "pothole",
+        "lat": 43.224787,
+        "lon": 76.879143,
+        "size_cm": 39.3,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 29,
+        "type": "faded_marking",
+        "lat": 43.200725,
+        "lon": 76.915683,
+        "size_cm": 10.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 30,
+        "type": "faded_marking",
+        "lat": 43.261837,
+        "lon": 76.891122,
+        "size_cm": 36.4,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 31,
+        "type": "pothole",
+        "lat": 43.216911,
+        "lon": 76.937721,
+        "size_cm": 7.4,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 32,
+        "type": "faded_marking",
+        "lat": 43.242865,
+        "lon": 76.882784,
+        "size_cm": 35.3,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 33,
+        "type": "rutting",
+        "lat": 43.208627,
+        "lon": 76.94256,
+        "size_cm": 20.2,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 34,
+        "type": "pothole",
+        "lat": 43.225911,
+        "lon": 76.912913,
+        "size_cm": 21.7,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 35,
+        "type": "rutting",
+        "lat": 43.253887,
+        "lon": 76.914951,
+        "size_cm": 16.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 36,
+        "type": "pothole",
+        "lat": 43.235962,
+        "lon": 76.882939,
+        "size_cm": 34.3,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 37,
+        "type": "crack",
+        "lat": 43.216823,
+        "lon": 76.881129,
+        "size_cm": 13.9,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 38,
+        "type": "rutting",
+        "lat": 43.269653,
+        "lon": 76.939577,
+        "size_cm": 36.2,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 39,
+        "type": "faded_marking",
+        "lat": 43.204094,
+        "lon": 76.891056,
+        "size_cm": 37.3,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 40,
+        "type": "faded_marking",
+        "lat": 43.224705,
+        "lon": 76.8945,
+        "size_cm": 20.4,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 41,
+        "type": "crack",
+        "lat": 43.219897,
+        "lon": 76.875495,
+        "size_cm": 30.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 42,
+        "type": "faded_marking",
+        "lat": 43.229192,
+        "lon": 76.90588,
+        "size_cm": 36.7,
+        "traffic_level": 3,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 43,
+        "type": "pothole",
+        "lat": 43.216668,
+        "lon": 76.89758,
+        "size_cm": 5.8,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 44,
+        "type": "rutting",
+        "lat": 43.249541,
+        "lon": 76.858126,
+        "size_cm": 25.8,
+        "traffic_level": 1,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 45,
+        "type": "crack",
+        "lat": 43.237448,
+        "lon": 76.872581,
+        "size_cm": 38.2,
+        "traffic_level": 2,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 46,
+        "type": "rutting",
+        "lat": 43.251889,
+        "lon": 76.906272,
+        "size_cm": 31.6,
+        "traffic_level": 2,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 47,
+        "type": "rutting",
+        "lat": 43.211269,
+        "lon": 76.867725,
+        "size_cm": 26.3,
+        "traffic_level": 2,
+        "is_near_social": true,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 48,
+        "type": "rutting",
+        "lat": 43.202213,
+        "lon": 76.881167,
+        "size_cm": 39.0,
+        "traffic_level": 3,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 49,
+        "type": "pothole",
+        "lat": 43.245448,
+        "lon": 76.932203,
+        "size_cm": 6.2,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    },
+    {
+        "id": 50,
+        "type": "faded_marking",
+        "lat": 43.244454,
+        "lon": 76.861117,
+        "size_cm": 5.9,
+        "traffic_level": 1,
+        "is_near_social": false,
+        "detected_at": "2026-03-28T15:00:00Z"
+    }
+]
