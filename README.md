@@ -6,6 +6,7 @@
 
 ---
 
+
 ## 📌 Проблема
 Традиционные методы мониторинга дорог страдают от:
 * **Субъективности:** Оценка качества покрытия зависит от человеческого фактора.
@@ -52,9 +53,22 @@
 
 ---
 
-## 🚀 Как запустить
+### 🚀 Как запустить
 
-1. **Клонируйте репозиторий:**
-   ```bash
-   git clone [https://github.com/your-username/roadsense-ai.git](https://github.com/your-username/roadsense-ai.git)
+1. Клонируйте репозиторий:
+   git clone https://github.com/your-username/roadsense-ai.git
    cd roadsense-ai
+
+2. Создайте и активируйте виртуальное окружение:
+   python -m venv .venv
+   source .venv/bin/activate  # Для Linux/Mac
+   .venv\Scripts\activate     # Для Windows
+
+3. Установите зависимости:
+   pip install -r requirements.txt
+
+4. Запустите дашборд:
+   streamlit run src/dashboard.py
+
+
+Ссылка на Demo-video https://youtu.be/lW73kqWlZCA
