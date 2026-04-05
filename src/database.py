@@ -39,6 +39,16 @@ def add_defect(defect_data):
     return inserted_id
 
 
+def delete_defect(defect_id):
+    conn = sqlite3.connect('data/roadsense.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM defects WHERE id = ?', (defect_id,))
+    deleted_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_rows > 0
+
+
 def save_defect(defect_data):
     """Совместимость с прототипом: сохраняет дефект и возвращает его ID."""
     return add_defect(defect_data)

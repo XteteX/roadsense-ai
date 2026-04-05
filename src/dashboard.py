@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
+from folium.plugins import HeatMap
 from streamlit_folium import st_folium
 import json
 import os
@@ -17,7 +18,7 @@ if PROJECT_ROOT not in sys.path:
 
 from src.detection import RoadDetector
 from src.engine import RoadAnalyzer
-from src.database import init_db, add_defect
+from src.database import init_db, add_defect, delete_defect
 
 
 # Инициализируем БД при запуске приложения
@@ -42,7 +43,6 @@ if "map_focus" not in st.session_state:
 st.title("🛣️ RoadSense AI: Система мониторинга дорог Алматы")
 st.markdown("---")
 
-@st.cache_data
 def get_defects_from_db():
     """Загружает все дефекты из SQLite в DataFrame."""
     db_path = os.path.join('data', 'roadsense.db')
@@ -132,6 +132,20 @@ if defects:
                     weight=3,
                 ).add_to(m)
         
+        # Переключатель тепловой карты плотности дефектов
+        show_heatmap = st.checkbox("Показать тепловую карту (плотность дефектов)", value=True)
+
+        if show_heatmap and defects:
+            # [lat, lon, weight], где weight в диапазоне 0..1
+            heat_data = [[p['lat'], p['lon'], min(max(p.get('score', 0) / 100, 0), 1)] for p in defects]
+            HeatMap(
+                heat_data,
+                radius=15,
+                blur=10,
+                min_opacity=0.5,
+                max_zoom=17,
+            ).add_to(m)
+
         # Отрисовка карты
         st_folium(m, width="100%", height=600)
 
@@ -165,8 +179,18 @@ if defects:
                 st.write(f"**Тип:** {analyzer.type_labels.get(p['type'])}")
                 st.write(f"**Размер:** {p['size_cm']} см")
                 st.warning(f"**Вердикт ИИ:** {p['explanation']}")
-                if st.button(f"Направить бригаду #{p['id']}"):
+                if st.button(f"Направить бригаду #{p['id']}", key=f"dispatch_{p['id']}"):
                     st.success("Наряд сформирован!")
+                if st.button(f"Удалить точку #{p['id']}", key=f"delete_{p['id']}"):
+                    was_deleted = delete_defect(p['id'])
+                    if was_deleted:
+                        if st.session_state.get("last_added_id") == p['id']:
+                            st.session_state["last_added_id"] = None
+                            st.session_state["map_focus"] = ALMATY_CENTER
+                        st.success(f"Точка #{p['id']} удалена.")
+                        st.rerun()
+                    else:
+                        st.error("Не удалось удалить точку: запись не найдена.")
 else:
     st.warning("База данных пуста. Импортируйте начальные данные.")
     if st.button("Импортировать начальные данные из JSON"):
@@ -175,7 +199,6 @@ else:
         if err:
             st.error(err)
         else:
-            get_defects_from_db.clear()
             st.success(f"Импортировано {imported_count} записей в базу данных.")
             st.rerun()
 
@@ -184,6 +207,8 @@ st.sidebar.image("https://img.icons8.com/fluency/96/road.png", width=80)
 st.sidebar.title("RoadSense AI")
 st.sidebar.write("v1.0-MVP")
 st.sidebar.markdown("---")
+if st.sidebar.button("Обновить данные на карте"):
+    st.rerun()
 
 with st.sidebar:
     st.header("📸 Новый отчет (YOLOv8s)")
@@ -238,14 +263,25 @@ with st.sidebar:
                     }
                     
                     new_id = add_defect(new_data)
-                    get_defects_from_db.clear()
                     st.session_state["last_added_id"] = new_id
                     st.session_state["map_focus"] = (lat, lon)
                     st.balloons()
                     st.success("Данные сохранены в SQLite!")
                     st.rerun() # Обновляем страницу, чтобы точка появилась
 
+df_stat = pd.DataFrame(defects) if defects else pd.DataFrame()
+
 st.sidebar.write("**Статистика:**")
-if defects:
-    df_stat = pd.DataFrame(defects)
+if not df_stat.empty:
     st.sidebar.dataframe(df_stat['category'].value_counts())
+else:
+    st.sidebar.caption("Пока нет данных для аналитики.")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("💎 Экономический эффект")
+
+# Простая оценка ROI: раннее обнаружение помогает избежать более дорогого ремонта.
+total_saved = len(df_stat) * 45000
+st.sidebar.metric("Экономия бюджета (прогноз)", f"{total_saved:,.0f} ₸")
+st.sidebar.progress(min(len(df_stat) / 100, 1.0), text=f"Обработано заявок: {len(df_stat)}")
+st.sidebar.caption("Расчет на основе предиктивного обнаружения трещин до их разрушения.")
