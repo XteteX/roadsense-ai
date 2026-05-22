@@ -1,84 +1,89 @@
-# 🚧 RoadSense AI: Интеллектуальный мониторинг дорог Алматы
 
-**RoadSense AI** — это комплексная экосистема на базе компьютерного зрения для автоматизированного обнаружения, анализа и приоритизации дорожных дефектов.  
+```markdown
+# 🚧 RoadSense AI: Intelligent Road Monitoring in Almaty
 
-Проект разработан специально для цифровизации работы городских служб и акимата г. Алматы.
+**RoadSense AI** is a comprehensive computer vision-powered ecosystem for the automated detection, analysis, and prioritization of road defects.  
 
----
-
-## 🎯 Миссия проекта
-
-Перейти от реактивного латания дыр по жалобам к **предиктивному управлению городом на основе данных**.
+The project was developed specifically to digitalize the workflow of municipal services and the Akimat (city administration) of Almaty.
 
 ---
 
-## 🌟 Ключевые возможности
+## 🎯 Project Mission
 
-### 🤖 Гражданский мониторинг (Telegram Bot)
-- Сбор данных от жителей города  
-- Встроенный ИИ-фильтр отсеивает спам и нерелевантные изображения (селфи, животные)
+Shift from reactive pothole patching based on citizen complaints to **data-driven predictive urban management**.
+
+---
+
+## 🌟 Key Features
+
+### 🤖 Citizen Monitoring (Telegram Bot)
+- Data collection directly from city residents  
+- Built-in AI filter screens out spam and irrelevant images (selfies, pets, etc.)
 
 ### 🧠 Explainable AI (XAI)
-- Система объясняет критичность дефекта  
-- Учитывает:
-  - тип дороги  
-  - трафик  
-  - близость к школам и больницам  
+- The system automatically explains the severity and urgency of a defect  
+- Factors considered:
+  - Road type  
+  - Traffic volume  
+  - Proximity to critical social infrastructure (schools, hospitals)  
 
-### 🗺️ Тепловые карты (Heatmaps)
-- Визуализация плотности дефектов  
-- Планирование ремонта на уровне районов, а не отдельных точек  
+### 🗺️ Heatmaps
+- Visualization of defect density across the city  
+- Repair planning optimized at the district level rather than isolated points  
 
-### ⚖️ Соответствие стандартам
-- СТ РК 1218-2003  
-- ГОСТ 32883-2014  
+### ⚖️ Compliance with Standards
+- ST RK 1218-2003  
+- GOST 32883-2014  
 
-### 📑 Автоматизация «под ключ»
-- Генерация PDF-нарядов  
-- Фото-подтверждение  
-- GPS-координаты  
-
----
-
-## 🛠 Технологический стек
-
-| Модуль        | Технология |
-|--------------|-----------|
-| Ядро ИИ       | YOLOv8 (Fine-tuned), OpenCV |
-| Backend       | FastAPI (Python), асинхронная архитектура |
-| Интерфейс     | Streamlit + Folium |
-| База данных   | SQLite3 |
-| Сбор данных   | Telegram Bot API (pyTelegramBotAPI) |
-| Аналитика     | Scikit-learn |
+### 📑 Turnkey Automation
+- Automatic generation of PDF work orders  
+- Photo confirmation attachments  
+- Precise GPS coordinates  
 
 ---
 
-## 📐 Математическая модель приоритизации (XAI)
+## 🛠 Tech Stack
 
-Приоритет дефекта рассчитывается по формуле:
+| Module | Technology |
+|---|---|
+| AI Core | YOLOv8 (Fine-tuned), OpenCV |
+| Backend | FastAPI (Python), asynchronous architecture |
+| Interface | Streamlit + Folium |
+| Database | SQLite3 |
+| Data Collection | Telegram Bot API (pyTelegramBotAPI) |
+| Analytics | Scikit-learn |
 
-```math
-P = (S \cdot w_1) + (T \cdot w_2) + (L \cdot w_3)
-```
-Где:
+---
 
-S — площадь дефекта (YOLOv8)
-T — индекс трафика
-L — социальная значимость
-w₁, w₂, w₃ — весовые коэффициенты
-🚀 Инструкция по запуску
-1. Подготовка системы
+## 📐 Prioritization Mathematical Model (XAI)
 
-Убедитесь, что установлен Python 3.9+
+The defect priority score is calculated using the following formula:
 
-# Клонирование репозитория
-git clone https://github.com/XteteX/roadsense-ai.git
+$$P = (S \cdot w_1) + (T \cdot w_2) + (L \cdot w_3)$$
+
+Where:
+* **S** — defect area (detected by YOLOv8)
+* **T** — traffic volume index
+* **L** — social significance score
+* **w₁, w₂, w₃** — weight coefficients
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. System Preparation
+
+Ensure you have Python 3.9+ installed.
+
+```bash
+# Clone the repository
+git clone [https://github.com/XteteX/roadsense-ai.git](https://github.com/XteteX/roadsense-ai.git)
 cd roadsense-ai
 
-# Создание виртуального окружения
+# Create a virtual environment
 python -m venv .venv
 
-# Активация
+# Activation
 
 # Windows
 .venv\Scripts\activate
@@ -86,33 +91,68 @@ python -m venv .venv
 # Linux / macOS
 source .venv/bin/activate
 
-# Установка зависимостей
+# Install dependencies
 pip install -r requirements.txt
-2. Запуск проекта
 
-Система состоит из двух модулей:
+```
 
-📊 Дашборд управления
+### 2. Running the Project
+
+The system consists of two separate modules:
+
+📊 **Management Dashboard**
+
+```bash
 streamlit run src/dashboard.py
-🤖 Telegram-бот
-python src/bot.py
-📂 Структура проекта
-src/        — основной код (бот, дашборд, логика)
-data/       — база данных и медиа
-models/     — веса YOLOv8 (best.pt)
-assets/     — изображения и схемы
-requirements.txt
-⚠️ Ограничения
-❄️ Погода: снижение точности при снеге и тумане
-🌙 Освещенность: проблемы ночью
-📍 GPS: погрешность 5–10 метров
-🛣️ Roadmap
-Интеграция с камерами «Сергек»
-Анализ дорожной разметки и знаков
-Предиктивный анализ износа дорог
-👥 Команда
-Орынтай Марлен — Lead Developer / Backend / AI Architect
-Даулетов Амиржан — AI Engineer / Frontend / UX Designer
-📄 Лицензия
 
-Проект разработан в рамках хакатона. Все права защищены.
+```
+
+🤖 **Telegram Bot**
+
+```bash
+python src/bot.py
+
+```
+
+---
+
+## 📂 Project Structure
+
+* `src/`         — core source code (bot, dashboard, processing logic)
+* `data/`        — database storage and media files
+* `models/`      — YOLOv8 model weights (`best.pt`)
+* `assets/`      — UI images and architectural diagrams
+* `requirements.txt` — project dependencies
+
+---
+
+## ⚠️ Limitations
+
+* ❄️ **Weather:** reduced detection accuracy during heavy snow or dense fog
+* 🌙 **Illumination:** suboptimal performance under low-light nighttime conditions
+* 📍 **GPS:** standard positioning margin of error between 5–10 meters
+
+---
+
+## 🛣️ Roadmap
+
+* [ ] Integration with "Sergek" city traffic cameras
+* [ ] Automated analysis of road markings and traffic signs
+* [ ] Predictive modeling for long-term road wear and tear
+
+---
+
+## 👥 Team
+
+* **Oryntai Marlen** — Lead Developer / Backend / AI Architect
+* **Dauletov Amirzhan** — AI Engineer / Frontend / UX Designer
+
+---
+
+## 📄 License
+
+The project was developed as part of a hackathon. All rights reserved.
+
+```
+
+```
