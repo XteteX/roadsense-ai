@@ -144,7 +144,7 @@ python src/bot.py
 
 ## 👥 Team
 
-* **Oryntai Marlen** — Lead Developer / Backend / AI Architect
+* **Oryntay Marlen** — Lead Developer / Backend / AI Architect
 * **Dauletov Amirzhan** — AI Engineer / Frontend / UX Designer
 
 ---
