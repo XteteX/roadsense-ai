@@ -1,5 +1,3 @@
-
-```markdown
 # 🚧 RoadSense AI: Intelligent Road Monitoring in Almaty
 
 **RoadSense AI** is a comprehensive computer vision-powered ecosystem for the automated detection, analysis, and prioritization of road defects.  
@@ -7,7 +5,11 @@
 The project was developed specifically to digitalize the workflow of municipal services and the Akimat (city administration) of Almaty.
 
 ---
+## 🌐 Live Demo
 
+**[▶ Open RoadSense AI Dashboard](https://roadsense-ai-shfh8ssrifzngffcamzqpd.streamlit.app/)**
+
+---
 ## 🎯 Project Mission
 
 Shift from reactive pothole patching based on citizen complaints to **data-driven predictive urban management**.
@@ -93,66 +95,61 @@ source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
 ```
 
-### 2. Running the Project
-
-The system consists of two separate modules:
-
-📊 **Management Dashboard**
-
+### Run the Dashboard
 ```bash
 streamlit run src/dashboard.py
-
 ```
 
-🤖 **Telegram Bot**
-
+### Run the Telegram Bot
 ```bash
 python src/bot.py
-
 ```
 
 ---
 
 ## 📂 Project Structure
 
-* `src/`         — core source code (bot, dashboard, processing logic)
-* `data/`        — database storage and media files
-* `models/`      — YOLOv8 model weights (`best.pt`)
-* `assets/`      — UI images and architectural diagrams
-* `requirements.txt` — project dependencies
+```
+roadsense-ai/
+├── src/
+│   ├── dashboard.py      # Streamlit web interface
+│   ├── bot.py            # Telegram bot
+│   ├── detection.py      # YOLOv8 inference
+│   ├── engine.py         # Priority scoring engine
+│   └── database.py       # SQLite operations
+├── data/                 # Database and media files
+├── models/               # YOLOv8 model weights
+├── assets/               # UI images and diagrams
+└── requirements.txt
+```
 
 ---
 
-## ⚠️ Limitations
+## ⚠️ Known Limitations
 
-* ❄️ **Weather:** reduced detection accuracy during heavy snow or dense fog
-* 🌙 **Illumination:** suboptimal performance under low-light nighttime conditions
-* 📍 **GPS:** standard positioning margin of error between 5–10 meters
+- Reduced detection accuracy during heavy snow or dense fog
+- Suboptimal performance under low-light nighttime conditions
+- GPS positioning margin of error: 5–10 meters
 
 ---
 
 ## 🛣️ Roadmap
 
-* [ ] Integration with "Sergek" city traffic cameras
-* [ ] Automated analysis of road markings and traffic signs
-* [ ] Predictive modeling for long-term road wear and tear
+- Integration with "Sergek" city traffic cameras
+- Automated analysis of road markings and traffic signs
+- Predictive modeling for long-term road wear and tear
 
 ---
 
 ## 👥 Team
 
-* **Oryntay Marlen** — Lead Developer / Backend / AI Architect
-* **Dauletov Amirzhan** — AI Engineer / Frontend / UX Designer
+- **Oryntay Marlen** — Lead Developer / Backend / AI Architect
+- **Dauletov Amirzhan** — AI Engineer / Frontend / UX Designer
 
 ---
 
 ## 📄 License
 
-The project was developed as part of a hackathon. All rights reserved.
-
-```
-
-```
+Developed as part of Decentrathon 5.0 hackathon. All rights reserved.
