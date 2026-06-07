@@ -192,15 +192,12 @@ if defects:
                     else:
                         st.error("Не удалось удалить точку: запись не найдена.")
 else:
-    st.warning("База данных пуста. Импортируйте начальные данные.")
-    if st.button("Импортировать начальные данные из JSON"):
-        with st.spinner("Импортируем данные в БД..."):
-            imported_count, err = import_initial_data_from_json()
-        if err:
-            st.error(err)
-        else:
-            st.success(f"Импортировано {imported_count} записей в базу данных.")
-            st.rerun()
+    with st.spinner("Загружаем демо-данные..."):
+        imported_count, err = import_initial_data_from_json()
+    if err:
+        st.warning(f"Демо-данные не найдены: {err}")
+    else:
+        st.rerun()
 
 # Сайдбар
 st.sidebar.image("https://img.icons8.com/fluency/96/road.png", width=80)
