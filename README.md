@@ -1,46 +1,71 @@
-# 🚧 RoadSense AI: Intelligent Road Monitoring in Almaty
+# 🚧 RoadSense AI: Road Defect Monitoring Prototype for Almaty
 
-**RoadSense AI** is a comprehensive computer vision-powered ecosystem for the automated detection, analysis, and prioritization of road defects.  
+RoadSense AI is a hackathon prototype that lets residents report potholes through a Telegram bot. A computer vision model checks each photo, and the system ranks confirmed reports by repair priority on a city dashboard.
 
-The project was developed specifically to digitalize the workflow of municipal services and the Akimat (city administration) of Almaty.
+Built in 10 days at **Decentrathon 5.0** (Top 5).
 
 ---
+
 ## 🌐 Live Demo
 
 **[▶ Open RoadSense AI Dashboard](https://roadsense-ai-shfh8ssrifzngffcamzqpd.streamlit.app/)**
 
----
-## 🎯 Project Mission
-
-Shift from reactive pothole patching based on citizen complaints to **data-driven predictive urban management**.
+The map on the demo dashboard is pre-filled with **synthetic sample data** (`src/utils.py`), so you can see the heatmap and filters before real reports arrive.
 
 ---
 
-## 🌟 Key Features
+## 🎯 Goal
 
-### 🤖 Citizen Monitoring (Telegram Bot)
-- Data collection directly from city residents  
-- Built-in AI filter screens out spam and irrelevant images (selfies, pets, etc.)
+Help city services move from handling complaints one at a time to planning repairs from aggregated, prioritised data.
 
-### 🧠 Explainable AI (XAI)
-- The system automatically explains the severity and urgency of a defect  
-- Factors considered:
-  - Road type  
-  - Traffic volume  
-  - Proximity to critical social infrastructure (schools, hospitals)  
+---
 
-### 🗺️ Heatmaps
-- Visualization of defect density across the city  
-- Repair planning optimized at the district level rather than isolated points  
+## ✅ Project Status
 
-### ⚖️ Compliance with Standards
-- ST RK 1218-2003  
-- GOST 32883-2014  
+| Component | Status | What it does now |
+|---|---|---|
+| Pothole detection | Working | Runs a pre-trained, open-source YOLOv8 pothole model (`pothole_best.pt`) on each photo |
+| Telegram bot | Working | Accepts photos, rejects ones with no detected pothole, saves confirmed reports, skips duplicate messages |
+| Priority scoring + explanation | Working | Scores each report from 0 to 100, assigns a category and writes a text explanation of the score |
+| Dashboard | Working | Map with markers, defect-density heatmap, category filter, manual photo upload |
+| Database | Working | SQLite stores reports and the bot's processed-message log |
+| Defect size | Simulated | Estimated from the bounding-box area plus a random offset; not a real measurement |
+| Location | Simulated | Derived from where the pothole appears in the image, offset from Almaty's centre; no real GPS yet |
+| Traffic and nearby schools/hospitals | Manual / fixed | Set by sliders on the dashboard; the bot uses fixed defaults |
+| REST API | Stub | FastAPI app with health-check endpoints only (`src/main.py`) |
 
-### 📑 Turnkey Automation
-- Automatic generation of PDF work orders  
-- Photo confirmation attachments  
-- Precise GPS coordinates  
+---
+
+## 🧠 How Priority Is Calculated
+
+The rules in `src/engine.py` are written by hand. There is no trained model behind them, so every score can be explained.
+
+```
+score = type_weight × size_cm × (1 + 0.4 × (traffic_level − 1)) + social_bonus
+```
+
+| Term | Values |
+|---|---|
+| `type_weight` | pothole 1.5 · rutting 1.1 · crack 0.7 · faded marking 0.4 |
+| `traffic_level` | 1 (low) · 2 (medium) · 3 (high) |
+| `social_bonus` | +15 if a school or hospital is nearby, otherwise 0 |
+
+The score is capped at 100 and mapped to a category:
+
+| Score | Category |
+|---|---|
+| ≥ 80 | Critical |
+| 50–79 | High |
+| 25–49 | Medium |
+| < 25 | Low (planned) |
+
+Each report also gets a text explanation (generated in Russian). For a 30 cm pothole on a medium-traffic road near a school, the score is 1.5 × 30 × 1.4 + 15 = **78.0 (High)**, explained as:
+
+> *Приоритет 78.0/100 обусловлен следующими факторами: значительный размер выбоина (30 см), умеренная нагрузка на участок, близость к социально значимым объектам, высокая вероятность повреждения подвески и потери управления.*
+>
+> (Priority 78.0/100 is driven by: large pothole size (30 cm), moderate traffic load, proximity to social infrastructure, high risk of suspension damage and loss of control.)
+
+The detector only finds **potholes**. Cracks, rutting and faded markings appear in the synthetic sample data to show how the scoring and the map would work with more defect types.
 
 ---
 
@@ -48,63 +73,52 @@ Shift from reactive pothole patching based on citizen complaints to **data-drive
 
 | Module | Technology |
 |---|---|
-| AI Core | YOLOv8 (Fine-tuned), OpenCV |
-| Backend | FastAPI (Python), asynchronous architecture |
-| Interface | Streamlit + Folium |
+| Detection | Ultralytics YOLOv8 (pre-trained pothole model), OpenCV |
+| Bot | pyTelegramBotAPI |
+| Dashboard | Streamlit, Folium, streamlit-folium |
 | Database | SQLite3 |
-| Data Collection | Telegram Bot API (pyTelegramBotAPI) |
-| Analytics | Scikit-learn |
+| API (stub) | FastAPI |
 
 ---
 
-## 📐 Prioritization Mathematical Model (XAI)
+## 🚀 Quick Start
 
-The defect priority score is calculated using the following formula:
-
-$$P = (S \cdot w_1) + (T \cdot w_2) + (L \cdot w_3)$$
-
-Where:
-* **S** — defect area (detected by YOLOv8)
-* **T** — traffic volume index
-* **L** — social significance score
-* **w₁, w₂, w₃** — weight coefficients
-
----
-
-## 🚀 Quick Start Guide
-
-### 1. System Preparation
-
-Ensure you have Python 3.9+ installed.
+Requires Python 3.11 (see `runtime.txt`).
 
 ```bash
-# Clone the repository
-git clone [https://github.com/XteteX/roadsense-ai.git](https://github.com/XteteX/roadsense-ai.git)
+git clone https://github.com/XteteX/roadsense-ai.git
 cd roadsense-ai
 
-# Create a virtual environment
 python -m venv .venv
-
-# Activation
-
 # Windows
 .venv\Scripts\activate
-
 # Linux / macOS
 source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### Run the Dashboard
+**Optional: generate sample data**
+
+```bash
+python src/utils.py      # writes 50 synthetic defects to data/defects.json
+```
+
+**Run the dashboard**
+
 ```bash
 streamlit run src/dashboard.py
 ```
 
-### Run the Telegram Bot
+**Run the Telegram bot**
+
 ```bash
-python src/bot.py
+# Linux / macOS
+export TELEGRAM_BOT_TOKEN="your-token"
+# Windows (PowerShell)
+$env:TELEGRAM_BOT_TOKEN="your-token"
+
+python -m src.bot        # run from the project root
 ```
 
 ---
@@ -114,14 +128,18 @@ python src/bot.py
 ```
 roadsense-ai/
 ├── src/
-│   ├── dashboard.py      # Streamlit web interface
-│   ├── bot.py            # Telegram bot
-│   ├── detection.py      # YOLOv8 inference
-│   ├── engine.py         # Priority scoring engine
-│   └── database.py       # SQLite operations
-├── data/                 # Database and media files
-├── models/               # YOLOv8 model weights
-├── assets/               # UI images and diagrams
+│   ├── bot.py          # Telegram bot: photo intake, validation, saving reports
+│   ├── dashboard.py    # Streamlit dashboard: map, heatmap, filters, manual upload
+│   ├── detection.py    # YOLOv8 inference and bounding-box drawing
+│   ├── engine.py       # Priority scoring and text explanations
+│   ├── database.py     # SQLite operations
+│   ├── utils.py        # Synthetic sample-data generator
+│   ├── migrate.py      # Imports data/defects.json into SQLite
+│   └── main.py         # FastAPI stub (health checks)
+├── data/
+│   ├── defects.json    # Synthetic sample defects
+│   └── roadsense.db    # SQLite database
+├── pothole_best.pt     # Pre-trained open-source pothole detection weights
 └── requirements.txt
 ```
 
@@ -129,27 +147,36 @@ roadsense-ai/
 
 ## ⚠️ Known Limitations
 
-- Reduced detection accuracy during heavy snow or dense fog
-- Suboptimal performance under low-light nighttime conditions
-- GPS positioning margin of error: 5–10 meters
+- **The model was not trained by our team** and was not evaluated on Almaty roads, so its accuracy here is unknown.
+- In testing it missed potholes in photos taken after rain, when the holes were filled with muddy water.
+- Location and defect size are approximations (see Project Status), not measurements.
+- The bot uses fixed traffic and "near school/hospital" values for every report.
+- Any Telegram user can submit photos; there is no protection against manipulated or misleading images.
 
 ---
 
 ## 🛣️ Roadmap
 
-- Integration with "Sergek" city traffic cameras
-- Automated analysis of road markings and traffic signs
-- Predictive modeling for long-term road wear and tear
+- [ ] Read real GPS from Telegram location messages or photo EXIF data
+- [ ] Collect and label local photos (rain, mud, snow, night) and fine-tune the detector on them
+- [ ] Measure mAP on a held-out set of Almaty photos
+- [ ] Look up traffic and nearby schools/hospitals from map data instead of fixed values
+- [ ] Generate PDF work orders for repair crews
+- [ ] Move the bot and dashboard onto a shared FastAPI backend
 
 ---
 
 ## 👥 Team
 
-- **Oryntay Marlen** — Lead Developer / Backend / AI Architect
-- **Dauletov Amirzhan** — AI Engineer / Frontend / UX Designer
+- **Marlen Oryntay**: team lead; AI integration, backend, Telegram bot, priority engine
+- **Amirzhan Dauletov**: frontend, dashboard UX, presentation
 
 ---
 
+## 🙏 Acknowledgements
+
+Pothole detection weights (`pothole_best.pt`) come from an open-source pre-trained YOLOv8 model. *Add the original source link and its licence here.*
+
 ## 📄 License
 
-Developed as part of Decentrathon 5.0 hackathon. All rights reserved.
+Developed for the Decentrathon 5.0 hackathon. All rights reserved.
