@@ -22,6 +22,10 @@ City road services in Almaty handle pothole complaints one at a time: a call or 
 
 The map is pre-filled with **synthetic sample data** (`data/defects.json`), so you can try the heatmap, filters and explanations right away. You can also upload your own road photo in the sidebar to run the detector. Streamlit Community Cloud puts idle apps to sleep, so the first load may take up to a minute.
 
+<p align="center">
+  <img src="docs/dashboard_overview.jpg" width="100%" alt="RoadSense AI dashboard: key numbers, defect map with heatmap and a ranked priority list">
+</p>
+
 ---
 
 ## ⚙️ How it works
@@ -69,6 +73,11 @@ score = type_weight × size_cm × (1 + 0.4 × (traffic_level − 1)) + social_bo
 **Example.** A 30 cm pothole on a medium-traffic road near a school scores 1.5 × 30 × 1.4 + 15 = **78.0 (High)**, and the dashboard explains:
 
 > *Priority 78.0/100 is driven by: large pothole (30.0 cm), moderate traffic load, close to a school or hospital, high risk of suspension damage and loss of control.*
+
+<p align="center">
+  <img src="docs/dashboard_priorities.jpg" width="85%" alt="Defect map with a priority-weighted heatmap next to the ranked list; the top report is expanded to show why it is critical"><br>
+  <em>Every report on the dashboard shows why it received its priority.</em>
+</p>
 
 The detector only finds **potholes**. Cracks, rutting and faded markings appear in the synthetic sample data to show how scoring and the map would work with more defect types.
 
@@ -171,6 +180,7 @@ roadsense-ai/
 │   ├── defects.json     # synthetic sample defects
 │   └── roadsense.db     # SQLite database used by the demo
 ├── pothole_best.pt      # pre-trained YOLOv8n pothole weights (6 MB)
+├── docs/                # screenshots for this README
 ├── .streamlit/          # Streamlit config
 ├── .github/workflows/   # CI
 ├── requirements.txt
