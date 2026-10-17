@@ -1,26 +1,28 @@
-import json
-import sqlite3
-import os
-from database import init_db, add_defect
-from engine import RoadAnalyzer
+"""Import data/defects.json into SQLite, scoring each defect with the priority engine.
 
-def migrate():
-    init_db() # Создаем таблицу, если её нет
+Run from the project root:  python -m src.migrate
+"""
+import json
+from pathlib import Path
+
+from src.database import add_defect, init_db
+from src.engine import RoadAnalyzer
+
+DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "defects.json"
+
+
+def migrate() -> int:
+    init_db()
     analyzer = RoadAnalyzer()
-    
-    with open('data/defects.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     for d in data:
-        # Пересчитываем приоритет через наш Engine
         analysis = analyzer.calculate_priority(
-            d['type'], d['size_cm'], d['traffic_level'], d.get('is_near_social', False)
+            d["type"], d["size_cm"], d["traffic_level"], d.get("is_near_social", False)
         )
-        # Добавляем в базу
-        d.update(analysis)
-        add_defect(d)
-    
-    print("✅ 50 точек успешно перенесены из JSON в SQLite!")
+        add_defect({**d, "is_near_social": d.get("is_near_social", False), **analysis})
+    print(f"Imported {len(data)} defects from JSON into SQLite.")
+    return len(data)
+
 
 if __name__ == "__main__":
     migrate()

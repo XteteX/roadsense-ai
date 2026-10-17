@@ -1,205 +1,201 @@
+"""RoadSense AI Telegram bot: residents send a photo, confirmed potholes go on the map.
+
+Run from the project root:
+
+    export TELEGRAM_BOT_TOKEN="your-token"      # PowerShell: $env:TELEGRAM_BOT_TOKEN="your-token"
+    python -m src.bot
+
+Replies are in Russian by default and in English for users whose Telegram
+interface language is English.
+"""
 import os
 import sqlite3
 import time
+from contextlib import closing
 from io import BytesIO
 
 import telebot
-from telebot import apihelper
-from telebot import types
 from PIL import Image
+from telebot import apihelper, types
 
-from src.database import add_defect, init_db
+from src.database import DB_PATH, add_defect, init_db
 from src.detection import RoadDetector
 from src.engine import RoadAnalyzer
 
+ALMATY_CENTER = (43.2389, 76.8897)
 
-# Токен можно передать через переменную окружения TELEGRAM_BOT_TOKEN.
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "ТВОЙ_ТОКЕН_БОТА")
+# Context of the reported road section. Until map data is connected, the bot uses
+# fixed defaults; the dashboard lets an operator adjust them (see README).
+DEFAULT_TRAFFIC_LEVEL = 2
+DEFAULT_NEAR_SOCIAL = True
 
-if not TOKEN or TOKEN == "ТВОЙ_ТОКЕН_БОТА":
-    raise RuntimeError(
-        "Не задан токен Telegram-бота. Установите TELEGRAM_BOT_TOKEN или замените TOKEN в src/bot.py"
-    )
+TEXTS = {
+    "ru": {
+        "welcome": (
+            "Привет! Я бот RoadSense AI.\n\n"
+            "Что я умею:\n"
+            "1) Принимать фото дефектов дороги\n"
+            "2) Проверять снимок нейросетью YOLOv8\n"
+            "3) Добавлять подтверждённую яму на карту города\n\n"
+            "Отправьте фото дефекта, и я проверю, есть ли на снимке яма."
+        ),
+        "help": (
+            "Инструкция:\n"
+            "1) Нажмите на скрепку и прикрепите фото\n"
+            "2) Дождитесь проверки\n"
+            "3) Новая точка появится на дашборде"
+        ),
+        "btn_photo": "Отправить фото дефекта",
+        "btn_help": "Помощь",
+        "ask_photo": "Пришлите, пожалуйста, фото дефекта дороги в этот чат.",
+        "only_photos": "Я пока обрабатываю только фото дефектов. Отправьте фото, и я добавлю заявку.",
+        "no_pothole": ("На изображении ям не обнаружено, заявка не добавлена. "
+                       "Попробуйте сфотографировать ближе и при хорошем освещении."),
+        "added": "Спасибо! Яма подтверждена (уверенность {conf:.0%}) и добавлена на карту RoadSense AI. "
+                 "ID заявки: {id}, приоритет: {score}/100.",
+        "error": "Не удалось обработать фото. Попробуйте отправить другое изображение.",
+    },
+    "en": {
+        "welcome": (
+            "Hi! I'm the RoadSense AI bot.\n\n"
+            "What I do:\n"
+            "1) Accept photos of road defects\n"
+            "2) Check each photo with a YOLOv8 neural network\n"
+            "3) Put confirmed potholes on the city map\n\n"
+            "Send a photo of a defect and I will check whether it shows a pothole."
+        ),
+        "help": (
+            "How to use:\n"
+            "1) Tap the paperclip and attach a photo\n"
+            "2) Wait for the check\n"
+            "3) The new point appears on the dashboard"
+        ),
+        "btn_photo": "Send a defect photo",
+        "btn_help": "Help",
+        "ask_photo": "Please send a photo of the road defect in this chat.",
+        "only_photos": "For now I only process photos of road defects. Send a photo and I will file a report.",
+        "no_pothole": "No pothole found in this photo, so no report was filed. Try a closer photo in good light.",
+        "added": "Thank you! Pothole confirmed (confidence {conf:.0%}) and added to the RoadSense AI map. "
+                 "Report ID: {id}, priority: {score}/100.",
+        "error": "Could not process the photo. Please try another image.",
+    },
+}
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("Set the TELEGRAM_BOT_TOKEN environment variable (see README).")
 
 bot = telebot.TeleBot(TOKEN)
 analyzer = RoadAnalyzer()
 detector = RoadDetector()
-
-# Гарантируем, что таблица существует до старта polling.
 init_db()
 
 
-def _processed_db_path():
-    return os.path.join("data", "roadsense.db")
-
+# --- de-duplication: Telegram may deliver the same update twice after a reconnect ---
 
 def _ensure_processed_messages_table():
-    conn = sqlite3.connect(_processed_db_path())
-    try:
-        conn.execute(
-            """
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS bot_processed_messages (
                 chat_id INTEGER NOT NULL,
                 message_id INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (chat_id, message_id)
             )
-            """
-        )
-        conn.commit()
-    finally:
-        conn.close()
+        """)
 
 
-def _is_already_processed(chat_id: int, message_id: int) -> bool:
-    conn = sqlite3.connect(_processed_db_path())
-    try:
-        row = conn.execute(
-            "SELECT 1 FROM bot_processed_messages WHERE chat_id = ? AND message_id = ? LIMIT 1",
-            (chat_id, message_id),
-        ).fetchone()
-        return row is not None
-    finally:
-        conn.close()
-
-
-def _mark_processed(chat_id: int, message_id: int):
-    conn = sqlite3.connect(_processed_db_path())
-    try:
-        conn.execute(
+def _mark_processed(chat_id: int, message_id: int) -> bool:
+    """Record the message; return False if it had already been processed."""
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+        cur = conn.execute(
             "INSERT OR IGNORE INTO bot_processed_messages (chat_id, message_id) VALUES (?, ?)",
             (chat_id, message_id),
         )
-        conn.commit()
-    finally:
-        conn.close()
+        return cur.rowcount == 1
 
 
 _ensure_processed_messages_table()
 
 
-WELCOME_TEXT = (
-    "Привет! Я бот RoadSense AI.\n\n"
-    "Что умею:\n"
-    "1) Принимать фото дефектов дорог\n"
-    "2) Добавлять заявку в систему мониторинга\n"
-    "3) Передавать точку на карту дашборда\n\n"
-    "Отправьте фото дефекта, и я сначала проверю, есть ли на снимке яма."
-)
+# --- handlers ---
+
+def _lang(message) -> str:
+    code = getattr(message.from_user, "language_code", None) or ""
+    return "en" if code.startswith("en") else "ru"
 
 
-def _main_keyboard():
+def _keyboard(lang: str):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(types.KeyboardButton("Отправить фото дефекта"))
-    keyboard.add(types.KeyboardButton("Помощь"))
+    keyboard.add(types.KeyboardButton(TEXTS[lang]["btn_photo"]))
+    keyboard.add(types.KeyboardButton(TEXTS[lang]["btn_help"]))
     return keyboard
 
 
 @bot.message_handler(commands=["start"])
 def handle_start(message):
-    bot.send_message(message.chat.id, WELCOME_TEXT, reply_markup=_main_keyboard())
+    lang = _lang(message)
+    bot.send_message(message.chat.id, TEXTS[lang]["welcome"], reply_markup=_keyboard(lang))
 
 
 @bot.message_handler(commands=["help"])
 def handle_help(message):
-    bot.send_message(
-        message.chat.id,
-        "Инструкция:\n"
-        "1) Нажмите скрепку и прикрепите фото\n"
-        "2) Дождитесь подтверждения\n"
-        "3) Проверьте новую точку в дашборде",
-        reply_markup=_main_keyboard(),
-    )
+    lang = _lang(message)
+    bot.send_message(message.chat.id, TEXTS[lang]["help"], reply_markup=_keyboard(lang))
 
 
 @bot.message_handler(content_types=["photo"])
 def handle_photo(message):
-    if _is_already_processed(message.chat.id, message.message_id):
+    if not _mark_processed(message.chat.id, message.message_id):
         return
-
-    _mark_processed(message.chat.id, message.message_id)
+    t = TEXTS[_lang(message)]
     try:
-        photo_info = message.photo[-1]
-        file_info = bot.get_file(photo_info.file_id)
-        photo_bytes = bot.download_file(file_info.file_path)
-        image = Image.open(BytesIO(photo_bytes)).convert("RGB")
+        file_info = bot.get_file(message.photo[-1].file_id)  # largest available size
+        image = Image.open(BytesIO(bot.download_file(file_info.file_path))).convert("RGB")
 
-        detection_result = detector.detect_and_process(image)
-        detected_data = detection_result.get("defect") if detection_result else None
-
-        if not detected_data:
-            bot.reply_to(
-                message,
-                "На изображении ям не обнаружено. Заявка не добавлена на карту. "
-                "Попробуйте сделать фото ближе и при хорошем освещении.",
-            )
+        detected = detector.detect_and_process(image)["defect"]
+        if not detected:
+            bot.reply_to(message, t["no_pothole"])
             return
 
-        # В MVP используем базовые контекстные параметры участка.
-        traffic_level = 2
-        is_near_social = True
         analysis = analyzer.calculate_priority(
-            "pothole",
-            float(detected_data.get("size_cm", 15.0)),
-            traffic_level,
-            is_near_social=is_near_social,
+            "pothole", detected["size_cm"], DEFAULT_TRAFFIC_LEVEL, is_near_social=DEFAULT_NEAR_SOCIAL
         )
-
-        lat = 43.2389 + float(detected_data.get("lat_offset", 0.0))
-        lon = 76.8897 + float(detected_data.get("lon_offset", 0.0))
-
-        new_point = {
+        new_id = add_defect({
             "type": "pothole",
-            "lat": lat,
-            "lon": lon,
-            "size_cm": float(detected_data.get("size_cm", 15.0)),
-            "traffic_level": traffic_level,
-            "is_near_social": is_near_social,
+            "lat": ALMATY_CENTER[0] + detected["lat_offset"],
+            "lon": ALMATY_CENTER[1] + detected["lon_offset"],
+            "size_cm": detected["size_cm"],
+            "traffic_level": DEFAULT_TRAFFIC_LEVEL,
+            "is_near_social": DEFAULT_NEAR_SOCIAL,
             **analysis,
-        }
-        new_id = add_defect(new_point)
-
-        bot.reply_to(
-            message,
-            "Спасибо! Яма подтверждена и добавлена на карту RoadSense AI "
-            f"(ID заявки: {new_id}).",
-        )
+        })
+        bot.reply_to(message, t["added"].format(conf=detected["confidence"], id=new_id, score=analysis["score"]))
     except Exception as e:
-        print(f"[PHOTO PROCESSING ERROR] {e}")
-        bot.reply_to(
-            message,
-            "Не удалось обработать фото. Попробуйте отправить другое изображение.",
-        )
+        print(f"[PHOTO PROCESSING ERROR] {e!r}")
+        bot.reply_to(message, t["error"])
 
 
 @bot.message_handler(content_types=["text"])
 def handle_text(message):
+    lang = _lang(message)
     text = (message.text or "").strip().lower()
     if text.startswith("/"):
         return
-
-    if text == "помощь":
+    if text in (TEXTS["ru"]["btn_help"].lower(), TEXTS["en"]["btn_help"].lower()):
         handle_help(message)
-        return
-
-    if text == "отправить фото дефекта":
-        bot.reply_to(message, "Пришлите, пожалуйста, фото дефекта дороги в этом чате.")
-        return
-
-    bot.reply_to(
-        message,
-        "Я пока обрабатываю только фото дефектов. Отправьте фото, и я добавлю заявку.",
-        reply_markup=_main_keyboard(),
-    )
+    elif text in (TEXTS["ru"]["btn_photo"].lower(), TEXTS["en"]["btn_photo"].lower()):
+        bot.reply_to(message, TEXTS[lang]["ask_photo"])
+    else:
+        bot.reply_to(message, TEXTS[lang]["only_photos"], reply_markup=_keyboard(lang))
 
 
 if __name__ == "__main__":
-    print("Telegram-бот RoadSense AI запущен...")
-    # Если у бота был настроен webhook, long polling не сможет работать стабильно.
+    print("RoadSense AI Telegram bot is running…")
+    # Long polling does not work while a webhook is set.
     try:
         bot.remove_webhook(drop_pending_updates=True)
-    except TypeError:
-        # Совместимость со старыми версиями pyTelegramBotAPI.
+    except TypeError:  # older pyTelegramBotAPI versions
         bot.remove_webhook()
 
     while True:
@@ -208,15 +204,13 @@ if __name__ == "__main__":
         except apihelper.ApiTelegramException as e:
             err_text = str(e)
             print(f"[Telegram API ERROR] {err_text}")
-
             if "409" in err_text:
-                print("Причина: конфликт getUpdates. Скорее всего запущен второй экземпляр бота.")
+                print("Cause: getUpdates conflict — another instance of the bot is probably running.")
             elif "401" in err_text:
-                print("Причина: неверный токен. Проверьте TELEGRAM_BOT_TOKEN.")
+                print("Cause: invalid token. Check TELEGRAM_BOT_TOKEN.")
             elif "429" in err_text:
-                print("Причина: лимит запросов. Повтор через несколько секунд.")
-
+                print("Cause: rate limit. Retrying in a few seconds.")
             time.sleep(3)
         except Exception as e:
-            print(f"[BOT ERROR] {e}")
+            print(f"[BOT ERROR] {e!r}")
             time.sleep(3)

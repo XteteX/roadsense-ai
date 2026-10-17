@@ -1,4 +1,9 @@
 venv/
+.venv/
 __pycache__/
 .vscode/
 *.pyc
+.pytest_cache/
+.env
+data/*.db-journal
+*_detected.jpg

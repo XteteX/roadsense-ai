@@ -1,284 +1,227 @@
-import streamlit as st
-import pandas as pd
-import folium
-from folium.plugins import HeatMap
-from streamlit_folium import st_folium
+"""RoadSense AI — Streamlit dashboard for city road services.
+
+Run from the project root:  streamlit run src/dashboard.py
+"""
 import json
 import os
-import sqlite3
-import sys
 import random
-from PIL import Image
+import sys
 
-# Инициализируем sys.path ДО импортов из src
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+import folium
+import pandas as pd
+import streamlit as st
+from folium.plugins import HeatMap
+from PIL import Image
+from streamlit_folium import st_folium
+
+# Make `src` importable when Streamlit runs this file directly.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from src.detection import RoadDetector
-from src.engine import RoadAnalyzer
-from src.database import init_db, add_defect, delete_defect
-
-
-# Инициализируем БД при запуске приложения
-init_db()
-
-# Настройка страницы
-st.set_page_config(page_title="RoadSense AI Dashboard", layout="wide", page_icon="🛣️")
-
-# Инициализация анализатора
-analyzer = RoadAnalyzer()
-
-# Инициализируем детектор
-detector = RoadDetector()
+from src.database import add_defect, delete_defect, get_defects, init_db  # noqa: E402
+from src.engine import CATEGORIES, CRITICAL, HIGH, MEDIUM, RoadAnalyzer, normalize_category  # noqa: E402
 
 ALMATY_CENTER = (43.2389, 76.8897)
+DEMO_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "defects.json")
 
-if "last_added_id" not in st.session_state:
-    st.session_state["last_added_id"] = None
-if "map_focus" not in st.session_state:
-    st.session_state["map_focus"] = ALMATY_CENTER
+# Marker colour (folium) and list icon for each priority category.
+CATEGORY_STYLE = {
+    CRITICAL: ("red", "🔴"),
+    HIGH: ("orange", "🟠"),
+    MEDIUM: ("blue", "🔵"),
+}
+DEFAULT_STYLE = ("green", "🟢")
 
-st.title("🛣️ RoadSense AI: Система мониторинга дорог Алматы")
-st.markdown("---")
+# Illustrative assumption for the pitch: repairing a defect early instead of after it
+# has grown saves on average this much (KZT). Not based on official city data.
+SAVINGS_PER_REPORT_KZT = 45_000
 
-def get_defects_from_db():
-    """Загружает все дефекты из SQLite в DataFrame."""
-    db_path = os.path.join('data', 'roadsense.db')
-    conn = sqlite3.connect(db_path)
-    try:
-        df = pd.read_sql_query("SELECT * FROM defects", conn)
-    finally:
-        conn.close()
-    return df
-
-
-def import_initial_data_from_json():
-    """Импортирует дефекты из JSON в БД с расчетом приоритета через engine."""
-    filepath = os.path.join('data', 'defects.json')
-    if not os.path.exists(filepath):
-        return 0, f"Файл {filepath} не найден. Сначала сгенерируйте данные через src/utils.py"
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        defects_raw = json.load(f)
-
-    imported = 0
-    for d in defects_raw:
-        analysis = analyzer.calculate_priority(
-            d['type'], d['size_cm'], d['traffic_level'], d['is_near_social']
-        )
-        defect_record = {
-            "type": d['type'],
-            "lat": d['lat'],
-            "lon": d['lon'],
-            "size_cm": d['size_cm'],
-            "traffic_level": d['traffic_level'],
-            "is_near_social": d['is_near_social'],
-            "score": analysis['score'],
-            "category": analysis['category'],
-            "explanation": analysis['explanation']
-        }
-        add_defect(defect_record)
-        imported += 1
-
-    return imported, None
+st.set_page_config(page_title="RoadSense AI Dashboard", layout="wide", page_icon="🛣️")
+init_db()
+analyzer = RoadAnalyzer()
 
 
-df_defects = get_defects_from_db()
-defects = df_defects.to_dict('records') if not df_defects.empty else []
+@st.cache_resource(show_spinner="Loading the YOLOv8 pothole model…")
+def get_detector():
+    from src.detection import RoadDetector  # heavy import, load once per server
 
-if defects:
-    # Разделение экрана на колонки
-    col1, col2 = st.columns([2, 1])
+    return RoadDetector()
 
-    with col1:
-        st.subheader(f"Карта дефектов (Всего: {len(defects)} точек)")
-        
-        # Центр карты: на последней добавленной точке, если она есть
-        map_center = st.session_state.get("map_focus", ALMATY_CENTER)
-        map_zoom = 14 if st.session_state.get("last_added_id") else 12
-        m = folium.Map(location=[map_center[0], map_center[1]], zoom_start=map_zoom)
-        
-        # Добавление меток
-        for p in defects:
-            is_last_added = p['id'] == st.session_state.get("last_added_id")
 
-            # Выбор цвета в зависимости от категории ИИ
-            color = "red" if p['category'] == "Критический" else \
-                    "orange" if p['category'] == "Высокий" else \
-                    "lightblue" if p['category'] == "Средний" else "green"
+def load_defects() -> list[dict]:
+    """Read all reports and make sure older (Russian) records display in English."""
+    defects = get_defects()
+    for d in defects:
+        d["category"] = normalize_category(d["category"])
+        if any("а" <= ch.lower() <= "я" for ch in (d.get("explanation") or "")):
+            d["explanation"] = analyzer.explain(d["type"], d["size_cm"], d["traffic_level"],
+                                                bool(d["is_near_social"]), d["score"])
+    return defects
 
-            icon_color = "red" if is_last_added else color
-            icon_name = "star" if is_last_added else "info-sign"
-            popup_text = f"ID #{p['id']}: {p['score']}/100 ({p['category']})"
-            if is_last_added:
-                popup_text = f"НОВАЯ ТОЧКА -> {popup_text}"
-            
-            folium.Marker(
-                [p['lat'], p['lon']],
-                popup=popup_text,
-                tooltip="Новая заявка" if is_last_added else f"Заявка #{p['id']}",
-                icon=folium.Icon(color=icon_color, icon=icon_name)
-            ).add_to(m)
 
-            if is_last_added:
-                folium.CircleMarker(
-                    location=[p['lat'], p['lon']],
-                    radius=14,
-                    color="red",
-                    fill=True,
-                    fill_opacity=0.2,
-                    weight=3,
-                ).add_to(m)
-        
-        # Переключатель тепловой карты плотности дефектов
-        show_heatmap = st.checkbox("Показать тепловую карту (плотность дефектов)", value=True)
+def import_demo_data() -> tuple[int, str | None]:
+    """Fill an empty database with synthetic demo defects from data/defects.json."""
+    if not os.path.exists(DEMO_DATA_PATH):
+        return 0, "data/defects.json not found. Generate it with: python src/utils.py"
+    with open(DEMO_DATA_PATH, encoding="utf-8") as f:
+        raw = json.load(f)
+    for d in raw:
+        analysis = analyzer.calculate_priority(d["type"], d["size_cm"], d["traffic_level"], d["is_near_social"])
+        add_defect({**{k: d[k] for k in ("type", "lat", "lon", "size_cm", "traffic_level", "is_near_social")},
+                    **analysis})
+    return len(raw), None
 
-        if show_heatmap and defects:
-            # [lat, lon, weight], где weight в диапазоне 0..1
-            heat_data = [[p['lat'], p['lon'], min(max(p.get('score', 0) / 100, 0), 1)] for p in defects]
-            HeatMap(
-                heat_data,
-                radius=15,
-                blur=10,
-                min_opacity=0.5,
-                max_zoom=17,
-            ).add_to(m)
 
-        # Отрисовка карты
-        st_folium(m, width="100%", height=600)
+st.session_state.setdefault("last_added_id", None)
+st.session_state.setdefault("map_focus", ALMATY_CENTER)
 
-        if st.session_state.get("last_added_id"):
-            st.info("Последняя добавленная заявка выделена красной звездой и кругом.")
-
-    with col2:
-        st.subheader("📊 Аналитика ИИ и Обоснование")
-        
-        # Фильтр по критичности
-        category_filter = st.selectbox(
-            "Показать категорию:", 
-            ["Все", "Критический", "Высокий", "Средний", "Низкий (Плановый)"]
-        )
-        
-        # Сортировка по приоритету (сначала самые важные)
-        df = pd.DataFrame(defects)
-        df = df.sort_values(by="score", ascending=False)
-        
-        filtered_defects = df.to_dict('records')
-        if category_filter != "Все":
-            filtered_defects = [d for d in filtered_defects if d['category'] == category_filter]
-
-        st.write(f"Отображено: {len(filtered_defects)} заявок")
-        st.markdown("---")
-
-        # Список заявок с объяснением
-        for p in filtered_defects[:15]: # Показываем топ-15 для производительности
-            icon = "🔴" if p['category'] == "Критический" else "🟠" if p['category'] == "Высокий" else "🟢"
-            with st.expander(f"{icon} ID #{p['id']} - Приоритет {p['score']}"):
-                st.write(f"**Тип:** {analyzer.type_labels.get(p['type'])}")
-                st.write(f"**Размер:** {p['size_cm']} см")
-                st.warning(f"**Вердикт ИИ:** {p['explanation']}")
-                if st.button(f"Направить бригаду #{p['id']}", key=f"dispatch_{p['id']}"):
-                    st.success("Наряд сформирован!")
-                if st.button(f"Удалить точку #{p['id']}", key=f"delete_{p['id']}"):
-                    was_deleted = delete_defect(p['id'])
-                    if was_deleted:
-                        if st.session_state.get("last_added_id") == p['id']:
-                            st.session_state["last_added_id"] = None
-                            st.session_state["map_focus"] = ALMATY_CENTER
-                        st.success(f"Точка #{p['id']} удалена.")
-                        st.rerun()
-                    else:
-                        st.error("Не удалось удалить точку: запись не найдена.")
-else:
-    with st.spinner("Загружаем демо-данные..."):
-        imported_count, err = import_initial_data_from_json()
+defects = load_defects()
+if not defects:
+    with st.spinner("Loading demo data…"):
+        _, err = import_demo_data()
     if err:
-        st.warning(f"Демо-данные не найдены: {err}")
-    else:
-        st.rerun()
-
-# Сайдбар
-st.sidebar.image("https://img.icons8.com/fluency/96/road.png", width=80)
-st.sidebar.title("RoadSense AI")
-st.sidebar.write("v1.0-MVP")
-st.sidebar.markdown("---")
-if st.sidebar.button("Обновить данные на карте"):
+        st.warning(f"Demo data not found: {err}")
+        st.stop()
     st.rerun()
 
+# ---------------------------------------------------------------------------
+# Header and KPIs
+# ---------------------------------------------------------------------------
+st.title("🛣️ RoadSense AI: Road Monitoring System for Almaty")
+st.caption("Residents report potholes through a Telegram bot, a YOLOv8 model verifies each photo, "
+           "and every confirmed report gets an explainable repair priority.")
+
+df = pd.DataFrame(defects)
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Open reports", len(df))
+k2.metric("Critical", int((df["category"] == CRITICAL).sum()))
+k3.metric("High priority", int((df["category"] == HIGH).sum()))
+k4.metric("Average priority", f"{df['score'].mean():.0f} / 100")
+st.divider()
+
+col_map, col_list = st.columns([2, 1])
+
+# ---------------------------------------------------------------------------
+# Map
+# ---------------------------------------------------------------------------
+with col_map:
+    st.subheader(f"Defect map ({len(defects)} reports)")
+    show_heatmap = st.checkbox("Show heatmap (defect density weighted by priority)", value=True)
+
+    last_id = st.session_state["last_added_id"]
+    m = folium.Map(location=list(st.session_state["map_focus"]), zoom_start=14 if last_id else 12)
+
+    for p in defects:
+        is_new = p["id"] == last_id
+        color, _ = CATEGORY_STYLE.get(p["category"], DEFAULT_STYLE)
+        popup = f"Report #{p['id']}: {p['score']}/100 ({p['category']})"
+        folium.Marker(
+            [p["lat"], p["lon"]],
+            popup=f"NEW → {popup}" if is_new else popup,
+            tooltip="New report" if is_new else f"Report #{p['id']}",
+            icon=folium.Icon(color="red" if is_new else color, icon="star" if is_new else "info-sign"),
+        ).add_to(m)
+        if is_new:
+            folium.CircleMarker([p["lat"], p["lon"]], radius=14, color="red", fill=True,
+                                fill_opacity=0.2, weight=3).add_to(m)
+
+    if show_heatmap:
+        HeatMap([[p["lat"], p["lon"], min(max(p["score"] / 100, 0), 1)] for p in defects],
+                radius=15, blur=10, min_opacity=0.5, max_zoom=17).add_to(m)
+
+    # returned_objects=[] stops the page from re-running on every pan or zoom.
+    st_folium(m, height=600, use_container_width=True, returned_objects=[])
+    if last_id:
+        st.info("The most recently added report is marked with a red star and circle.")
+
+# ---------------------------------------------------------------------------
+# Prioritised list with explanations
+# ---------------------------------------------------------------------------
+with col_list:
+    st.subheader("📊 Priorities and explanations")
+    category_filter = st.selectbox("Show category:", ["All"] + CATEGORIES)
+
+    ranked = df.sort_values("score", ascending=False).to_dict("records")
+    if category_filter != "All":
+        ranked = [d for d in ranked if d["category"] == category_filter]
+    st.write(f"Showing {min(len(ranked), 15)} of {len(ranked)} reports, highest priority first")
+
+    for p in ranked[:15]:
+        _, icon = CATEGORY_STYLE.get(p["category"], DEFAULT_STYLE)
+        with st.expander(f"{icon} Report #{p['id']} · priority {p['score']} · {p['category']}"):
+            st.write(f"**Type:** {analyzer.type_labels.get(p['type'], p['type'])}")
+            st.write(f"**Size:** {p['size_cm']:.1f} cm (estimate)")
+            st.write(f"**Traffic level:** {['low', 'medium', 'high'][int(p['traffic_level']) - 1]}"
+                     f"{' · near a school/hospital' if p['is_near_social'] else ''}")
+            st.warning(f"**Why this priority:** {p['explanation']}")
+            b1, b2 = st.columns(2)
+            if b1.button("Dispatch crew", key=f"dispatch_{p['id']}"):
+                st.success("Work order created (demo).")
+            if b2.button("Delete report", key=f"delete_{p['id']}"):
+                if delete_defect(p["id"]):
+                    if st.session_state["last_added_id"] == p["id"]:
+                        st.session_state["last_added_id"] = None
+                        st.session_state["map_focus"] = ALMATY_CENTER
+                    st.rerun()
+                else:
+                    st.error("Could not delete the report: record not found.")
+
+# ---------------------------------------------------------------------------
+# Sidebar: new report from a photo
+# ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("📸 Новый отчет (YOLOv8s)")
-    uploaded_file = st.file_uploader("Загрузить фото дефекта", type=['jpg', 'jpeg', 'png'])
+    st.title("🛣️ RoadSense AI")
+    st.caption("v1.0 MVP · Decentrathon 5.0")
+    if st.button("Refresh map data"):
+        st.rerun()
+    st.divider()
+
+    st.header("📸 New report")
+    uploaded_file = st.file_uploader("Upload a photo of a road defect", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
-        # Покажем фото пользователю
-        image_pil = Image.open(uploaded_file)
-        
-        # Вызов реального Computer Vision
-        with st.spinner("Запускаем YOLOv8s для анализа..."):
-            detection_result = detector.detect_and_process(image_pil)
-            
-            # detection_result = {"defect": {...}, "image": PIL_Image_with_boxes}
-            detected_data = detection_result['defect']
-            image_with_boxes = detection_result['image']
-            
-            if detected_data:
-                detected_type = detected_data['type']
-                detected_size = detected_data['size_cm']
-                st.success(f"Обнаружено: {analyzer.type_labels.get(detected_type)}, размер ~{detected_size}см")
-                st.info(f"Вероятность детекции: {round(detected_data['confidence']*100, 1)}%")
-            else:
-                st.warning("Дефекты не обнаружены. Попробуйте другое фото.")
-                detected_type = None
-        
-        # Показываем изображение с bounding boxes
-        st.image(image_with_boxes, caption="Результат анализа YOLO (зелёные рамки - обнаруженные объекты)", use_container_width=True)
+        image = Image.open(uploaded_file).convert("RGB")
+        with st.spinner("Running YOLOv8 pothole detection…"):
+            result = get_detector().detect_and_process(image)
+        detected = result["defect"]
 
-        # Форма подтверждения (если дефект найден)
-        if detected_type:
+        if detected:
+            st.success(f"Detected: pothole, estimated size ~{detected['size_cm']} cm")
+            st.info(f"Detection confidence: {detected['confidence'] * 100:.1f}%")
+        else:
+            st.warning("No potholes detected. Try a closer photo in good light.")
+        st.image(result["image"], caption="YOLOv8 result (green boxes = detected potholes)",
+                 width="stretch")
+
+        if detected:
             with st.form("add_defect_form"):
-                st.write("### Подтвердите данные")
-                # Жюри оценит: можно редактировать ИИ-ответ
-                lat_offset = detected_data.get("lat_offset", random.uniform(-0.01, 0.01))
-                lon_offset = detected_data.get("lon_offset", random.uniform(-0.01, 0.01))
-                lat = st.number_input("Широта (Lat)", value=ALMATY_CENTER[0] + lat_offset, format="%.6f")
-                lon = st.number_input("Долгота (Lon)", value=ALMATY_CENTER[1] + lon_offset, format="%.6f")
-                traffic = st.slider("Уровень трафика", 1, 3, 2)
-                social = st.checkbox("Рядом школа/больница?")
-                
-                if st.form_submit_button("Внести в реестр"):
-                    # Считаем приоритет через наш Engine
-                    analysis = analyzer.calculate_priority(detected_type, detected_size, traffic, social)
-                    
-                    # Формируем объект для базы
-                    new_data = {
-                        "type": detected_type, "lat": lat, "lon": lon,
-                        "size_cm": detected_size, "traffic_level": traffic,
-                        "is_near_social": social, "score": analysis['score'],
-                        "category": analysis['category'], "explanation": analysis['explanation']
-                    }
-                    
-                    new_id = add_defect(new_data)
+                st.write("### Confirm the details")
+                st.caption("The location is approximate until GPS support is added. You can edit it.")
+                lat = st.number_input("Latitude", value=ALMATY_CENTER[0] + detected.get("lat_offset", random.uniform(-0.01, 0.01)), format="%.6f")
+                lon = st.number_input("Longitude", value=ALMATY_CENTER[1] + detected.get("lon_offset", random.uniform(-0.01, 0.01)), format="%.6f")
+                traffic = st.select_slider("Traffic level", options=[1, 2, 3], value=2,
+                                           format_func=lambda v: {1: "Low", 2: "Medium", 3: "High"}[v])
+                social = st.checkbox("School or hospital nearby?")
+
+                if st.form_submit_button("Add to registry"):
+                    analysis = analyzer.calculate_priority("pothole", detected["size_cm"], traffic, social)
+                    new_id = add_defect({
+                        "type": "pothole", "lat": lat, "lon": lon, "size_cm": detected["size_cm"],
+                        "traffic_level": traffic, "is_near_social": social, **analysis,
+                    })
                     st.session_state["last_added_id"] = new_id
                     st.session_state["map_focus"] = (lat, lon)
                     st.balloons()
-                    st.success("Данные сохранены в SQLite!")
-                    st.rerun() # Обновляем страницу, чтобы точка появилась
+                    st.rerun()
 
-df_stat = pd.DataFrame(defects) if defects else pd.DataFrame()
+    st.divider()
+    st.subheader("📈 Reports by priority")
+    counts = df["category"].value_counts().reindex(CATEGORIES, fill_value=0)
+    st.bar_chart(counts, horizontal=True, sort=False, height=180)
 
-st.sidebar.write("**Статистика:**")
-if not df_stat.empty:
-    st.sidebar.dataframe(df_stat['category'].value_counts())
-else:
-    st.sidebar.caption("Пока нет данных для аналитики.")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("💎 Экономический эффект")
-
-# Простая оценка ROI: раннее обнаружение помогает избежать более дорогого ремонта.
-total_saved = len(df_stat) * 45000
-st.sidebar.metric("Экономия бюджета (прогноз)", f"{total_saved:,.0f} ₸")
-st.sidebar.progress(min(len(df_stat) / 100, 1.0), text=f"Обработано заявок: {len(df_stat)}")
-st.sidebar.caption("Расчет на основе предиктивного обнаружения трещин до их разрушения.")
+    st.subheader("💎 Economic impact")
+    st.metric("Estimated budget savings", f"{len(df) * SAVINGS_PER_REPORT_KZT:,.0f} ₸")
+    st.progress(min(len(df) / 100, 1.0), text=f"Reports processed: {len(df)}")
+    st.caption(f"Illustrative estimate: {SAVINGS_PER_REPORT_KZT:,} ₸ saved per defect fixed early, "
+               "before it grows into a costlier repair. Not based on official city data.")

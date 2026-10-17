@@ -1,107 +1,113 @@
-import math
+"""Repair-priority scoring with a plain-language explanation for every score.
+
+The rules are hand-written (there is no trained model behind them), so each
+score can be traced back to the inputs. See the README for the formula.
+"""
+from __future__ import annotations
+
+# Priority categories, from most to least urgent.
+CRITICAL = "Critical"
+HIGH = "High"
+MEDIUM = "Medium"
+LOW = "Low (planned)"
+CATEGORIES = [CRITICAL, HIGH, MEDIUM, LOW]
+
+# Categories stored by earlier (Russian) versions of the app -> current names.
+LEGACY_CATEGORIES = {
+    "Критический": CRITICAL,
+    "Высокий": HIGH,
+    "Средний": MEDIUM,
+    "Низкий (Плановый)": LOW,
+}
+
+
+def normalize_category(category: str) -> str:
+    return LEGACY_CATEGORIES.get(category, category)
+
 
 class RoadAnalyzer:
-    """
-    Класс для анализа дефектов дорожного покрытия, расчета приоритета ремонта
-    и генерации текстовых обоснований (Explainability).
-    """
+    """Scores road defects and explains the score."""
 
     def __init__(self):
-        # Веса типов дефектов: чем опаснее для авто, тем выше множитель
+        # The more dangerous a defect is for vehicles, the higher its weight.
         self.type_weights = {
-            "pothole": 1.5,        # Яма (самое опасное)
-            "crack": 0.7,          # Трещина
-            "faded_marking": 0.4,  # Стертая разметка
-            "rutting": 1.1         # Колейность
+            "pothole": 1.5,
+            "rutting": 1.1,
+            "crack": 0.7,
+            "faded_marking": 0.4,
         }
-        
-        # Перевод типов для объяснений
         self.type_labels = {
-            "pothole": "выбоина",
-            "crack": "трещина",
-            "faded_marking": "износ разметки",
-            "rutting": "колейность"
+            "pothole": "pothole",
+            "crack": "crack",
+            "faded_marking": "faded road marking",
+            "rutting": "rutting",
         }
 
-    def calculate_priority(self, defect_type: str, size_cm: float, traffic_level: int, is_near_social: bool = False):
+    def calculate_priority(self, defect_type: str, size_cm: float, traffic_level: int,
+                           is_near_social: bool = False) -> dict:
         """
-        defect_type: тип дефекта (pothole, crack, etc.)
-        size_cm: размер или глубина дефекта в см
-        traffic_level: уровень трафика (1 - низкий, 2 - средний, 3 - высокий)
-        is_near_social: находится ли рядом со школой, больницей и т.д.
+        defect_type:    pothole, crack, faded_marking or rutting
+        size_cm:        size (or depth) of the defect in cm
+        traffic_level:  1 = low, 2 = medium, 3 = high
+        is_near_social: a school, hospital or similar facility is nearby
         """
-        
-        # 1. Базовый балл на основе типа и размера
         weight = self.type_weights.get(defect_type, 1.0)
         base_score = weight * size_cm
-        
-        # 2. Модификатор трафика (высокий трафик ускоряет разрушение)
+
+        # Heavy traffic makes defects grow faster and makes them more dangerous.
         traffic_multiplier = 1.0 + (traffic_level - 1) * 0.4
-        
-        # 3. Бонус за социальную значимость
         social_bonus = 15 if is_near_social else 0
-        
-        # Итоговый расчет
-        final_score = (base_score * traffic_multiplier) + social_bonus
-        
-        # Ограничиваем шкалой от 0 до 100
-        final_score = min(round(final_score, 1), 100)
-        
-        # Генерация категории срочности
-        category = self._get_category(final_score)
-        
-        # Генерация объяснения
-        explanation = self._generate_explanation(
-            defect_type, size_cm, traffic_level, is_near_social, final_score
-        )
-        
+
+        final_score = min(round(base_score * traffic_multiplier + social_bonus, 1), 100)
+
         return {
             "score": final_score,
-            "category": category,
-            "explanation": explanation
+            "category": self._get_category(final_score),
+            "explanation": self.explain(defect_type, size_cm, traffic_level, is_near_social, final_score),
         }
 
-    def _get_category(self, score: float) -> str:
-        if score >= 80: return "Критический"
-        if score >= 50: return "Высокий"
-        if score >= 25: return "Средний"
-        return "Низкий (Плановый)"
+    @staticmethod
+    def _get_category(score: float) -> str:
+        if score >= 80:
+            return CRITICAL
+        if score >= 50:
+            return HIGH
+        if score >= 25:
+            return MEDIUM
+        return LOW
 
-    def _generate_explanation(self, d_type, size, traffic, social, score) -> str:
-        label = self.type_labels.get(d_type, "дефект")
+    def explain(self, d_type: str, size: float, traffic: int, social: bool, score: float) -> str:
+        label = self.type_labels.get(d_type, "defect")
         reasons = []
 
-        # Логика обоснования
         if size > 15:
-            reasons.append(f"значительный размер {label} ({size} см)")
+            reasons.append(f"large {label} ({size:.1f} cm)")
         else:
-            reasons.append(f"наличие {label}")
+            reasons.append(f"{label} present ({size:.1f} cm)")
 
         if traffic == 3:
-            reasons.append("интенсивный транспортный поток (высокий риск ДТП)")
+            reasons.append("heavy traffic (high accident risk)")
         elif traffic == 2:
-            reasons.append("умеренная нагрузка на участок")
+            reasons.append("moderate traffic load")
 
         if social:
-            reasons.append("близость к социально значимым объектам")
+            reasons.append("close to a school or hospital")
 
         if score > 75 and d_type == "pothole":
-            reasons.append("высокая вероятность повреждения подвески и потери управления")
+            reasons.append("high risk of suspension damage and loss of control")
 
-        # Формируем итоговую фразу
-        main_text = f"Приоритет {score}/100 обусловлен следующими факторами: " + ", ".join(reasons) + "."
-        return main_text
+        return f"Priority {score}/100 is driven by: " + ", ".join(reasons) + "."
 
-# Пример для тестирования модуля
+
 if __name__ == "__main__":
     analyzer = RoadAnalyzer()
-    
-    # Тест 1: Опасная яма на трассе
-    result = analyzer.calculate_priority("pothole", 20, 3, is_near_social=True)
-    print(f"Результат 1: {result['category']} - {result['score']}")
-    print(f"Обоснование: {result['explanation']}\n")
 
-    # Тест 2: Маленькая трещина во дворе
+    # A dangerous pothole on a busy road next to a school
+    result = analyzer.calculate_priority("pothole", 20, 3, is_near_social=True)
+    print(f"Example 1: {result['category']} - {result['score']}")
+    print(f"Explanation: {result['explanation']}\n")
+
+    # A small crack in a quiet residential street
     result = analyzer.calculate_priority("crack", 5, 1)
-    print(f"Результат 2: {result['category']} - {result['score']}")
-    print(f"Обоснование: {result['explanation']}")
+    print(f"Example 2: {result['category']} - {result['score']}")
+    print(f"Explanation: {result['explanation']}")

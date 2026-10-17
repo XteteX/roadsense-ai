@@ -1,156 +1,101 @@
+"""Pothole detection with a pre-trained YOLOv8 model."""
+from __future__ import annotations
+
+import random
+from pathlib import Path
+
 import cv2
-from ultralytics import YOLO
 import numpy as np
 from PIL import Image
-import random
+from ultralytics import YOLO
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_WEIGHTS = PROJECT_ROOT / "pothole_best.pt"
+
+POTHOLE_COLOR = (0, 200, 0)    # BGR green
+OTHER_COLOR = (128, 128, 128)  # BGR grey
+
 
 class RoadDetector:
-    def __init__(self, model_path=None):
-        # По умолчанию используем вашу дообученную модель ям.
-        if model_path is None:
-            self.model = YOLO('pothole_best.pt')
-        else:
-            self.model = YOLO(model_path)
+    def __init__(self, model_path: str | Path | None = None, conf: float = 0.25):
+        self.model = YOLO(str(model_path or DEFAULT_WEIGHTS))
+        self.conf = conf
 
-    def draw_bounding_boxes(self, open_cv_image, results, detected_defects):
-        """Рисует bounding boxes вокруг обнаруженных объектов"""
-        image_with_boxes = open_cv_image.copy()
-        
-        # Создаём список координат дефектов для быстрого поиска
-        defect_coords = []
-        for defect in detected_defects:
-            if 'coords' in defect:
-                defect_coords.append(defect['coords'])
-        
+    def draw_bounding_boxes(self, image_bgr: np.ndarray, results, pothole_boxes: set) -> np.ndarray:
+        """Draw potholes in green and any other detected class in grey."""
+        out = image_bgr.copy()
+        thickness = max(2, round(max(out.shape[:2]) / 400))
+        font_scale = max(0.5, max(out.shape[:2]) / 1200)
         for r in results:
-            boxes = r.boxes
-            for idx, box in enumerate(boxes):
-                # Координаты прямоугольника
-                coords = box.xyxy[0]
-                x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
-                
-                # Проверяем, это дефект или просто объект
-                c = box.cls
-                name = self.model.names[int(c)]
+            for box in r.boxes:
+                x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
+                name = self.model.names[int(box.cls)]
                 confidence = float(box.conf)
-                
-                # Проверяем, входит ли этот box в detected_defects по координатам
-                is_defect = False
-                for d_coords in defect_coords:
-                    if (d_coords[0] == x1 and d_coords[1] == y1 and 
-                        d_coords[2] == x2 and d_coords[3] == y2):
-                        is_defect = True
-                        break
-                
-                if is_defect:
-                    # Зелёная рамка для обнаруженных дефектов (ямы)
-                    color = (0, 255, 0)  # BGR: зелёный
-                    thickness = 3
-                    label = f"яма {confidence:.2f}"
-                else:
-                    # Серая рамка для остальных объектов
-                    color = (128, 128, 128)  # BGR: серый
-                    thickness = 1
-                    label = f"{name} {confidence:.2f}"
-                
-                # Рисуем прямоугольник
-                cv2.rectangle(image_with_boxes, (x1, y1), (x2, y2), color, thickness)
-                
-                # Пишем лейбл над рамкой
-                cv2.putText(image_with_boxes, label, (x1, max(y1 - 10, 20)),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                is_pothole = (x1, y1, x2, y2) in pothole_boxes
+                color = POTHOLE_COLOR if is_pothole else OTHER_COLOR
+                label = f"{'pothole' if is_pothole else name} {confidence:.2f}"
+                cv2.rectangle(out, (x1, y1), (x2, y2), color, thickness if is_pothole else 1)
+                # Label on a filled background so it stays readable on any road texture.
+                text_thickness = max(1, thickness - 1)
+                (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_thickness)
+                ty = max(y1, th + baseline + 4)
+                cv2.rectangle(out, (x1, ty - th - baseline - 4), (x1 + tw + 6, ty), color, -1)
+                cv2.putText(out, label, (x1 + 3, ty - baseline - 2), cv2.FONT_HERSHEY_SIMPLEX,
+                            font_scale, (255, 255, 255), text_thickness, cv2.LINE_AA)
+        return out
 
-        return image_with_boxes
-    
-    def detect_and_process(self, pil_image):
-        # Превращаем PIL image (из Streamlit) в OpenCV формат
-        open_cv_image = np.array(pil_image)
-        open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2BGR)
-        
-        # Запуск инференса
-        results = self.model(open_cv_image)
-        
-        detected_defects = []
-        
-        # Обработка результатов
+    def detect_and_process(self, pil_image: Image.Image) -> dict:
+        """Run detection on a PIL image.
+
+        Returns ``{"defect": <most confident pothole or None>, "image": <PIL image with boxes>}``.
+        """
+        image_bgr = cv2.cvtColor(np.array(pil_image.convert("RGB")), cv2.COLOR_RGB2BGR)
+        h, w = image_bgr.shape[:2]
+        results = self.model(image_bgr, conf=self.conf, verbose=False)
+
+        detected = []
         for r in results:
-            boxes = r.boxes
-            
-            # Для каждого объекта
-            for box in boxes:
-                class_id = int(box.cls)
-                class_name = self.model.names[class_id]
-                confidence = float(box.conf)
-                
-                # Получаем координаты
-                coords = box.xyxy[0]
-                x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
-                
-                # Учитываем только реальные ямы, найденные вашей обученной моделью.
-                if str(class_name).lower() != 'pothole':
+            for box in r.boxes:
+                if str(self.model.names[int(box.cls)]).lower() != "pothole":
                     continue
-                d_type = 'pothole'
-                
-                # Приблизительный расчет размера на основе площади Bounding Box
-                area = (x2 - x1) * (y2 - y1)
-                h, w = open_cv_image.shape[:2]
-                cx = (x1 + x2) / 2
-                cy = (y1 + y2) / 2
-                lat_offset = round((0.5 - (cy / h)) * 0.02, 5)
-                lon_offset = round(((cx / w) - 0.5) * 0.03, 5)
-                # Имитация размера ямы в см в зависимости от площади
-                size_cm = round(float(area / 1000), 1) + random.uniform(5, 15)
+                x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
+                cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+
+                # PROTOTYPE ONLY: there is no camera calibration or GPS yet, so the size is a
+                # rough guess from the box area and the map position is derived from where the
+                # pothole appears in the frame. See "Known limitations" in the README.
+                size_cm = round(float((x2 - x1) * (y2 - y1) / 1000) + random.uniform(5, 15), 1)
                 size_cm = max(min(size_cm, 40.0), 5.0)
 
-                detected_defects.append({
-                    "type": d_type,
+                detected.append({
+                    "type": "pothole",
                     "size_cm": size_cm,
-                    "confidence": confidence,
-                    "lat_offset": lat_offset,
-                    "lon_offset": lon_offset,
-                    "coords": (x1, y1, x2, y2)  # Сохраняем координаты для рисования
+                    "confidence": float(box.conf),
+                    "lat_offset": round((0.5 - cy / h) * 0.02, 5),
+                    "lon_offset": round((cx / w - 0.5) * 0.03, 5),
+                    "coords": (x1, y1, x2, y2),
                 })
-        
-        # Рисуем bounding boxes на изображении
-        image_with_boxes = self.draw_bounding_boxes(open_cv_image, results, detected_defects)
-        
-        
-        image_with_boxes_rgb = cv2.cvtColor(image_with_boxes, cv2.COLOR_BGR2RGB)
-        result_pil = Image.fromarray(image_with_boxes_rgb)
-        
-        
-        if detected_defects:
-            # Сортируем по вероятности
-            detected_defects.sort(key=lambda x: x['confidence'], reverse=True)
-            return {
-                "defect": detected_defects[0],
-                "image": result_pil
-            }
-        else:
-            return {
-                "defect": None,
-                "image": result_pil
-            }
+
+        boxed = self.draw_bounding_boxes(image_bgr, results, {d["coords"] for d in detected})
+        result_image = Image.fromarray(cv2.cvtColor(boxed, cv2.COLOR_BGR2RGB))
+
+        detected.sort(key=lambda d: d["confidence"], reverse=True)
+        return {"defect": detected[0] if detected else None, "image": result_image, "count": len(detected)}
+
+
 if __name__ == "__main__":
-    from PIL import Image
-    import requests
-    from io import BytesIO
+    import sys
 
-    print("Запуск теста системы детекции...")
+    if len(sys.argv) < 2:
+        sys.exit("Usage: python -m src.detection path/to/road_photo.jpg")
     detector = RoadDetector()
-    
-    # Скачаем тестовое фото дороги из интернета для проверки
-    test_url = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/bus.jpg"
-    response = requests.get(test_url)
-    img = Image.open(BytesIO(response.content))
-
-    print("Анализируем изображение...")
-    result = detector.detect_and_process(img)
-
-    if result and result.get("defect"):
+    result = detector.detect_and_process(Image.open(sys.argv[1]))
+    if result["defect"]:
         d = result["defect"]
-        print(f"✅ УСПЕХ! Найден объект: {d['type']}")
-        print(f"Точность: {round(d['confidence']*100, 2)}%")
-        print(f"Примерный размер: {d['size_cm']} см")
+        print(f"Found {result['count']} pothole(s); best confidence {d['confidence']:.0%}, "
+              f"estimated size ~{d['size_cm']} cm")
+        out = Path(sys.argv[1]).with_name(Path(sys.argv[1]).stem + "_detected.jpg")
+        result["image"].save(out)
+        print(f"Saved annotated image to {out}")
     else:
-        print("❌ Объекты не найдены, но код работает корректно.")
+        print("No potholes found.")
